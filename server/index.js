@@ -1,0 +1,41 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./app.js";
+import { config } from "./config.js";
+import { createPool } from "./db/pool.js";
+import { createCatalogReadRepository } from "./db/catalog-read-repository.js";
+import { createLibraryRepository } from "./db/library-repository.js";
+import { createApiRouter } from "./routes/index.js";
+import { createCatalogService } from "./services/catalog-service.js";
+import { createLibraryService } from "./services/library-service.js";
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const staticDir = path.join(rootDir, "dist", "client");
+let pool = null;
+let catalogRepository = null;
+let libraryRepository = null;
+
+if (config.databaseUrl) {
+  pool = createPool(config.databaseUrl);
+  catalogRepository = createCatalogReadRepository(pool);
+  libraryRepository = createLibraryRepository(pool);
+}
+
+const catalogService = createCatalogService({ repository: catalogRepository });
+const libraryService = createLibraryService({ catalogService, repository: libraryRepository });
+const healthCheck = pool
+  ? async () => {
+      await pool.query("SELECT 1");
+      return { status: "connected" };
+    }
+  : async () => ({ status: "not-configured", mode: "demo" });
+
+const app = createApp({
+  apiRouter: createApiRouter({ catalogService, libraryService, healthCheck }),
+  staticDir: existsSync(staticDir) ? staticDir : undefined,
+});
+
+app.listen(config.port, () => {
+  console.log(`SteamTwo API disponível na porta ${config.port}`);
+});

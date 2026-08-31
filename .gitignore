@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.vite/
+coverage/
+*.log
+work/
+
+
+.openai/
+AGENTS.md
+work_create_report.py
